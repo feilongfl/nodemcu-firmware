@@ -15,5 +15,3 @@ tools/toolchains/
 .project
 .settings/
 .vscode
-
-\.vscode/
