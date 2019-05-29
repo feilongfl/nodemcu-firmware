@@ -401,7 +401,7 @@ pre_build: $(TOP_DIR)/app/modules/server-ca.crt.h
 
 $(TOP_DIR)/app/modules/server-ca.crt.h: $(TOP_DIR)/server-ca.crt
 	$(summary) MKCERT $(patsubst $(TOP_DIR)/%,%,$<)
-	python $(TOP_DIR)/tools/make_server_cert.py $(TOP_DIR)/server-ca.crt > $(TOP_DIR)/app/modules/server-ca.crt.h
+	python2 $(TOP_DIR)/tools/make_server_cert.py $(TOP_DIR)/server-ca.crt > $(TOP_DIR)/app/modules/server-ca.crt.h
 
 DEFINES += -DHAVE_SSL_SERVER_CRT=\"server-ca.crt.h\"
 else
