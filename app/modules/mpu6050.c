@@ -34,12 +34,16 @@ typedef struct
 
 typedef struct
 {
-    uint8_t config;
+    uint8_t Config;
     uint8_t Accel;
-    uint8_t gyro;
+    uint8_t Gyro;
 } Mpu6050Config_t;
 
 MPU6050DATA_t MpuOffset;
+static const uint32_t GyroMaxArray[] = {250, 500, 1000, 2000};
+static const uint32_t AccelMaxArray[] = {2, 4, 8, 16};
+uint32_t GyroMax = 250;
+uint32_t AccelMax = 2;
 
 #define I2CREADSTART(i2cid, addr)                                                           \
     platform_i2c_send_start(i2cid);                                                         \
@@ -95,13 +99,17 @@ static int mpu6050_setup(Mpu6050Config_t *config)
     // power on
     w8u(mpu6050_i2c_id, 0x6B, 0x00);
 
-    // config
-    uint8_t *configPoint = (uint8_t *)config;
     // for (int i = 0; i < TYPESIZE(Mpu6050Config_t, uint8_t); i++)
     // {
     //     Mpu6050SetConfig(mpu6050_i2c_id, 0x6B, *(configPoint + i), 0x00);
     // }
-    STRUCTFOREACH(Mpu6050Config_t, uint8_t, Mpu6050SetConfig(mpu6050_i2c_id, 0x6B, *(configPoint + __i), 0x00));
+    STRUCTFOREACH(Mpu6050Config_t, uint8_t, Mpu6050SetConfig(mpu6050_i2c_id, 0x6B, *((uint8_t *)config + __i), 0x00));
+
+    uint8_t accelmaxconfig = 0b00000011 & (config->Accel >> 3);
+    uint8_t gyromaxconfig = 0b00000011 & (config->Gyro >> 3);
+
+    AccelMax = AccelMaxArray[accelmaxconfig];
+    GyroMax = GyroMaxArray[gyromaxconfig];
 
     return 0;
 }
@@ -179,17 +187,20 @@ static int lua_read_ori(lua_State *L)
     return TYPESIZE(MPU6050DATA_t, int16_t);
 }
 
-// return normalize number -1~1
+#define Normalize(num, max) ((double)(num) / (max))
+#define NormalizeInt16(num) Normalize((num), 0x10000 / 2 - 1)
+
 static int lua_read(lua_State *L)
 {
-    const int16_t *dataPoint = (const int16_t *)mpu6050_read_offset();
+    const MPU6050DATA_t *dataPoint = mpu6050_read_offset();
+    const TrisAxisData_t *accelPoint = &(dataPoint->Accel);
+    const TrisAxisData_t *gyroPoint = &(dataPoint->Gyro);
 
-    // for (int i = 0; i < TYPESIZE(MPU6050DATA_t, int16_t); i++)
-    // {
-    //     lua_pushinteger(L, *((int16_t *)dataPoint + i));
-    // }
-    STRUCTFOREACH(MPU6050DATA_t, int16_t,
-                  lua_pushnumber(L, (double)*(dataPoint + __i) / (0x10000 / 2 - 1)))
+    STRUCTFOREACH(TrisAxisData_t, int16_t,
+                  lua_pushnumber(L, AccelMax * NormalizeInt16(*((int16_t *)accelPoint + __i)))) //accel
+    lua_pushnumber(L, (double)(dataPoint->Temp) / 340 + 36.53);                                 //temp
+    STRUCTFOREACH(TrisAxisData_t, int16_t,
+                  lua_pushnumber(L, GyroMax * NormalizeInt16(*((int16_t *)gyroPoint + __i)))) //gyro
 
     return TYPESIZE(MPU6050DATA_t, int16_t);
 }
